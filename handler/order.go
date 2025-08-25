@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -25,6 +27,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		ProductID string `json:"productId"`
 		Quantity  int    `json:"quantity"`
 		User      string `json:"user"`
+		Amount    int    `json:"amount"`
 	}
 
 	// Parse JSON request body
@@ -35,19 +38,50 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	request, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:8081/check", nil)
-
+	request1, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:8081/inventory", nil)
 	// Inject tracing headers
-	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(request.Header))
-
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(request1.Header))
 	// Send request
 	client := http.Client{}
-	resp, err := client.Do(request)
+	resp1, err := client.Do(request1)
 	if err != nil {
 		http.Error(w, "failed to contact inventory", 500)
 		return
 	}
-	defer resp.Body.Close()
+	defer resp1.Body.Close()
+
+	// 2. Call Payment Service
+	paymentReq := map[string]interface{}{
+		"orderId": "temp-order", // we’ll replace with actual ID later
+		"user":    req.User,
+		"amount":  req.Amount,
+	}
+	paymentReqBody, _ := json.Marshal(paymentReq)
+
+	request2, _ := http.NewRequestWithContext(ctx, "POST", "http://localhost:8082/payment", bytes.NewBuffer(paymentReqBody))
+	request2.Header.Set("Content-Type", "application/json")
+	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(request2.Header))
+
+	resp2, err := client.Do(request2)
+	if err != nil {
+		http.Error(w, "failed to contact payment", http.StatusInternalServerError)
+		return
+	}
+	defer resp2.Body.Close()
+
+	// Check HTTP status
+	if resp2.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp2.Body)
+		http.Error(w, "payment service error: "+string(bodyBytes), resp2.StatusCode)
+		return
+	}
+
+	// Parse Payment Response
+	var paymentResp map[string]interface{}
+	if err := json.NewDecoder(resp2.Body).Decode(&paymentResp); err != nil {
+		http.Error(w, "invalid payment response", http.StatusInternalServerError)
+		return
+	}
 
 	// Create order with input fields
 	id := strconv.Itoa(rand.Intn(100000))
