@@ -3,7 +3,6 @@ package otel
 import (
 	"context"
 	"log"
-	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -42,12 +41,7 @@ func InitTracer() (*sdktrace.TracerProvider, error) {
 	)
 
 	otel.SetTracerProvider(tp)
-	defer func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			log.Printf("failed to shutdown tracer provider: %v", err)
-		}
-	}()
+
 	log.Println("Tracer initialized with OTLP exporter")
-	time.Sleep(2 * time.Second)
 	return tp, nil
 }
