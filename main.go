@@ -2,27 +2,42 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"order-service/handler"
 	"order-service/otel"
+	"os"
 
 	"github.com/gorilla/mux"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
 )
 
 func main() {
+	//creating a resource
+	res := resource.NewWithAttributes(
+		semconv.SchemaURL,
+		semconv.ServiceNameKey.String("order-service"),
+	)
 	// Setup OpenTelemetry
-	tp, err := otel.InitTracer()
+	tp, err := otel.InitTracer(res)
 	if err != nil {
-		log.Fatalf("failed to initialize tracer: %v", err)
+		slog.Error("failed to initialize tracer", "error", err)
 	}
 	defer tp.Shutdown(context.Background())
 
-	metricsHandler, shutdownMetrics, err := otel.InitMetrics()
+	metricsHandler, shutdownMetrics, err := otel.InitMetrics(res)
 	if err != nil {
-		log.Fatalf("failed to initialize metrics: %v", err)
+		slog.Error("failed to initialize metrics", "error", err)
 	}
 	defer shutdownMetrics(context.Background())
+
+	shutdownLogger, err := otel.InitLogger(res) // Pass resource to logger
+	if err != nil {
+		slog.Error("failed to initialize logger", "error", err)
+		os.Exit(1)
+	}
+	defer shutdownLogger(context.Background())
 
 	r := mux.NewRouter()
 	r.HandleFunc("/orders", handler.CreateOrder).Methods("POST")
@@ -30,6 +45,9 @@ func main() {
 	r.Handle("/metrics", metricsHandler)
 	r.Use(handler.MetricsMiddleware)
 
-	log.Println("Order Service running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	slog.Info("Order Service running on :8080")
+	if err := http.ListenAndServe(":8080", r); err != nil {
+		slog.Error("failed to start server", "error", err)
+		os.Exit(1)
+	}
 }

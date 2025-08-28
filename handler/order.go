@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -14,8 +15,6 @@ import (
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
 )
-
-// --- ADD ALL OF THIS NEW CODE ---
 
 // 1. Define your metrics globally.
 var (
@@ -113,6 +112,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	client := http.Client{}
 	resp1, err := client.Do(request1)
 	if err != nil {
+		// logging the error with context
+		slog.ErrorContext(ctx, "failed to contact inventory service", "error", err)
 		http.Error(w, "failed to contact inventory", 500)
 		return
 	}
@@ -120,7 +121,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Call Payment Service
 	paymentReq := map[string]interface{}{
-		"orderId": "temp-order", // we’ll replace with actual ID later
+		"orderId": "temp-order", // replace with actual ID later
 		"user":    req.User,
 		"amount":  req.Amount,
 	}
@@ -160,6 +161,8 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		"user":      req.User,
 		"status":    "created",
 	}
+
+	slog.InfoContext(ctx, "Order created successfully", "order_id", id)
 
 	// Store in memory
 	orders[id] = order

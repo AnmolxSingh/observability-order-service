@@ -11,25 +11,13 @@ import (
 	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 // InitMetrics sets up the Prometheus metrics exporter.
 // It returns the HTTP handler for the /metrics endpoint and a shutdown function.
-func InitMetrics() (http.Handler, func(context.Context) error, error) {
+func InitMetrics(res *resource.Resource) (http.Handler, func(context.Context) error, error) {
 	// The exporter is the component that sends data to Prometheus.
 	exporter, err := prometheus.New()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// The resource describes the service. It's duplicated here for simplicity
-	// to keep this file completely separate from the tracing setup.
-	res, err := resource.New(context.Background(),
-		resource.WithAttributes(
-			semconv.ServiceNameKey.String("order-service"),
-		),
-	)
 	if err != nil {
 		return nil, nil, err
 	}
