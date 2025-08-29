@@ -5,61 +5,51 @@ import (
 	"log/slog"
 	"os"
 
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
-	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	logglobal "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/trace"
 )
 
-// InitLogger sets up a structured logger that sends logs to the OTEL Collector.
+// InitLogger configures slog to send logs to the OpenTelemetry Collector.
 func InitLogger(res *resource.Resource) (func(context.Context) error, error) {
-	// Create the OTLP log exporter
-	logExporter, err := otlploghttp.New(context.Background(),
-		otlploghttp.WithEndpoint("localhost:4318"),
-		otlploghttp.WithURLPath("v1/logs"),
-		otlploghttp.WithInsecure(),
-	)
+	ctx := context.Background()
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "localhost:4317"
+	}
+
+	// 1. Create a new OTLP log exporter
+	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithInsecure(), otlploggrpc.WithEndpoint(endpoint))
 	if err != nil {
 		return nil, err
 	}
 
-	// Create a LoggerProvider
+	// 2. Create a logger provider with a batch processor and the exporter.
 	loggerProvider := log.NewLoggerProvider(
 		log.WithProcessor(log.NewBatchProcessor(logExporter)),
 		log.WithResource(res),
 	)
 
-	// Set the global logger provider
-	global.SetLoggerProvider(loggerProvider)
+	// 3. Set this logger provider as the global logger provider.
+	//    The otelslog bridge will use this global provider to send logs.
+	logglobal.SetLoggerProvider(loggerProvider)
 
-	// Use a custom handler to automatically add trace context to logs
-	handler := NewOtelSlogHandler(slog.NewJSONHandler(os.Stdout, nil))
+	// 4. THIS IS THE CORRECTED PART: Create the otelslog.Handler.
+	//    It doesn't wrap another handler. It *is* the handler.
+	//    It needs a name (we can use the schema URL) and the LoggerProvider.
+	handler := otelslog.NewHandler(res.SchemaURL(), otelslog.WithLoggerProvider(loggerProvider))
+
+	// 5. Create a new slog.Logger with our OpenTelemetry handler.
 	logger := slog.New(handler)
 
-	// Set the new logger as the global default
+	// 6. Set the new logger as the default for the application.
 	slog.SetDefault(logger)
 
+	// Optional: Log a message to confirm initialization
+	slog.Info("Logger initialized and configured to send to OTLP endpoint")
+
+	// Return the shutdown function for the logger provider.
 	return loggerProvider.Shutdown, nil
-}
-
-// OtelSlogHandler is a custom slog.Handler that adds trace context to logs.
-type OtelSlogHandler struct {
-	slog.Handler
-}
-
-func NewOtelSlogHandler(handler slog.Handler) *OtelSlogHandler {
-	return &OtelSlogHandler{Handler: handler}
-}
-
-// Handle adds trace_id and span_id to the log record if a span is active.
-func (h *OtelSlogHandler) Handle(ctx context.Context, r slog.Record) error {
-	span := trace.SpanFromContext(ctx)
-	if span.SpanContext().IsValid() {
-		r.AddAttrs(
-			slog.String("trace_id", span.SpanContext().TraceID().String()),
-			slog.String("span_id", span.SpanContext().SpanID().String()),
-		)
-	}
-	return h.Handler.Handle(ctx, r)
 }
