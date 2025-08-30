@@ -3,7 +3,7 @@ package otel
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -30,7 +30,7 @@ func InitMetrics(res *resource.Resource) (http.Handler, func(context.Context) er
 
 	// Set the global meter provider, so you can get a Meter from it globally.
 	otel.SetMeterProvider(mp)
-	log.Println("Metrics initialized.")
+	slog.Info("Prometheus metrics exporter initialized")
 
 	// Return the Prometheus HTTP handler and the meter provider's shutdown function.
 	return promhttp.Handler(), mp.Shutdown, nil

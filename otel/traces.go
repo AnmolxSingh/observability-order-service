@@ -2,7 +2,7 @@ package otel
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -17,7 +17,7 @@ func InitTracer(res *resource.Resource) (*sdktrace.TracerProvider, error) {
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
-		log.Printf("failed to create exporter: %v", err)
+		slog.Error("failed to create OTLP trace exporter", "error", err)
 		return nil, err
 	}
 
@@ -33,6 +33,6 @@ func InitTracer(res *resource.Resource) (*sdktrace.TracerProvider, error) {
 
 	otel.SetTracerProvider(tp)
 
-	log.Println("Tracer initialized with OTLP exporter")
+	slog.Info("OTLP Trace exporter initialized")
 	return tp, nil
 }
