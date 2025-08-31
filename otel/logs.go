@@ -16,9 +16,6 @@ import (
 func InitLogger(res *resource.Resource) (func(context.Context) error, error) {
 	ctx := context.Background()
 	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-	if endpoint == "" {
-		endpoint = "localhost:4318"
-	}
 
 	// 1. Create a new OTLP log exporter
 	logExporter, err := otlploghttp.New(ctx, otlploghttp.WithInsecure(), otlploghttp.WithEndpoint(endpoint))
