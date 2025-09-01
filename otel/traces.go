@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"log/slog"
+	"os"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
@@ -11,8 +12,9 @@ import (
 )
 
 func InitTracer(res *resource.Resource) (*sdktrace.TracerProvider, error) {
+	endpoint := os.Getenv("MY_TRACES_ENDPOINT")
 	exporter, err := otlptracegrpc.New(context.Background(),
-		otlptracegrpc.WithEndpoint("otel-collector:4317"),
+		otlptracegrpc.WithEndpoint(endpoint),
 		otlptracegrpc.WithInsecure(),
 	)
 	if err != nil {

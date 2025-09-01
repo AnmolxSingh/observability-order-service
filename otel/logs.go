@@ -15,7 +15,7 @@ import (
 // InitLogger configures slog to send logs to the OpenTelemetry Collector.
 func InitLogger(res *resource.Resource) (func(context.Context) error, error) {
 	ctx := context.Background()
-	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	endpoint := os.Getenv("MY_LOGS_ENDPOINT")
 
 	// 1. Create a new OTLP log exporter
 	logExporter, err := otlploghttp.New(ctx, otlploghttp.WithInsecure(), otlploghttp.WithEndpoint(endpoint))
