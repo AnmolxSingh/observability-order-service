@@ -26,7 +26,7 @@ func main() {
 	}
 	defer tp.Shutdown(context.Background())
 
-	metricsHandler, shutdownMetrics, err := otel.InitMetrics(res)
+	shutdownMetrics, err := otel.InitMetrics(res)
 	if err != nil {
 		slog.Error("failed to initialize metrics", "error", err)
 	}
@@ -42,7 +42,6 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/orders", handler.CreateOrder).Methods("POST")
 
-	r.Handle("/metrics", metricsHandler)
 	r.Use(handler.MetricsMiddleware)
 
 	slog.Info("Order Service running on :8080")

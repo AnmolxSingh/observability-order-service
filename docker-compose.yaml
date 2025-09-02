@@ -1,6 +1,11 @@
 networks:
   observability-net:
 
+volumes:
+  grafana-data:
+  prometheus-data:
+  loki-data:
+
 services:
   order-service:
     build: .
@@ -9,6 +14,7 @@ services:
     environment:
       - MY_LOGS_ENDPOINT=otel-collector:4318
       - MY_TRACES_ENDPOINT=otel-collector:4317
+      - MY_METRICS_ENDPOINT=otel-collector:4318
     networks:
       - observability-net
     depends_on:
@@ -20,6 +26,8 @@ services:
       - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
     ports:
       - "4318:4318"
+      - "8889:8889"
+      - "9464:9464"
     networks:
       - observability-net
     depends_on:
@@ -29,6 +37,7 @@ services:
     image: grafana/loki:latest
     volumes:
       - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
@@ -50,7 +59,19 @@ services:
       - "3000:3000"
     volumes:
       - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - grafana-data:/var/lib/grafana
     networks:
       - observability-net
     depends_on:
       - loki
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - observability-net
