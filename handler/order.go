@@ -105,7 +105,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	request1, _ := http.NewRequestWithContext(ctx, "GET", "http://localhost:8081/inventory", nil)
+	request1, _ := http.NewRequestWithContext(ctx, "GET", "http://inventory-service:8081/inventory", nil)
 	// Inject tracing headers
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(request1.Header))
 	// Send request
@@ -127,7 +127,7 @@ func CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 	paymentReqBody, _ := json.Marshal(paymentReq)
 
-	request2, _ := http.NewRequestWithContext(ctx, "POST", "http://localhost:8082/payment", bytes.NewBuffer(paymentReqBody))
+	request2, _ := http.NewRequestWithContext(ctx, "POST", "http://payment-service:8082/payment", bytes.NewBuffer(paymentReqBody))
 	request2.Header.Set("Content-Type", "application/json")
 	otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(request2.Header))
 
